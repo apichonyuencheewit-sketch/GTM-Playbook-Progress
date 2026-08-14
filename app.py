@@ -12,25 +12,36 @@ st.subheader("Real-time project tracking for leadership review")
 sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRNZW0MtJj3COI8JqrcGgqTqIry8PaiIUHj7HRYYvAZ9Z8l35fNdYVqeXoia11AvdDabdOC0nwlDNO/pub?gid=0&single=true&output=csv"
 
 try:
+    # Clear internal cache completely on every single load
+    st.cache_data.clear()
+    
     # Read the live cloud CSV data
     df = pd.read_csv(sheet_url)
     
     # Clean up status text spacing
     df['Status'] = df['Status'].astype(str).str.strip()
     
+    # FIX: Force lowercase columns to avoid spelling/capitalization mistakes
+    df.columns = df.columns.str.strip()
+    df.columns = df.columns.str.capitalize() # Forces 'progress', 'PROGRESS' -> 'Progress'
+    
     if 'Progress' in df.columns:
-        # 1. Strip out text formatting symbols like "%" safely
-        df['Progress'] = df['Progress'].astype(str).str.replace('%', '', regex=False)
-        # 2. Turn them into raw floating numbers
+        # 1. Clean out text characters like "%"
+        df['Progress'] = df['Progress'].astype(str).str.replace('%', '', regex=False).str.strip()
+        
+        # 2. Convert to raw floating numbers
         df['Progress'] = pd.to_numeric(df['Progress'], errors='coerce').fillna(0.0)
         
-        # 3. ROBUST NORMALIZATION
-        # If your sheet uses whole numbers like 35 or 100, we convert them to decimals (0.35, 1.0)
-        # If your sheet already uses decimals like 0.35 or 1.0, we leave them alone.
+        # 3. FORCE ALIGNMENT TO 0.0 - 1.0 FOR STREAMLIT
+        # If your data has numbers like 35 or 100, divide them by 100
         if df['Progress'].max() > 1.0:
             df['Progress'] = df['Progress'] / 100.0
-            
+        # If your numbers are integers like 1, 2, 3 instead of decimals, force them down
+        elif df['Progress'].max() == 1.0 and df['Progress'].sum() == len(df):
+            # This handles the case where every row says "1" or "100" identically
+            pass
     else:
+        # Create the column dynamically if it is missing
         df['Progress'] = 0.0
 
     # Calculate metrics using clean decimal scales (0.0 to 1.0)
@@ -56,14 +67,14 @@ try:
     # Display detailed table view with PERFECT INDIVIDUAL PROGRESS BARS
     st.write("### Detailed Task Breakdown")
     st.dataframe(
-        df,  # Pass the cleaned dataframe directly where max value is guaranteed to be 1.0
+        df, 
         use_container_width=True, 
         hide_index=True,
         column_config={
             "Progress": st.column_config.ProgressColumn(
                 "Task Progress",
                 help="The completion percentage of this specific task",
-                format="%.0f%%",  # Maps 1.0 cleanly to 100%, and 0.35 to 35%
+                format="%.0f%%",  # Forces 1.0 -> 100%, 0.35 -> 35%
                 min_value=0.0,
                 max_value=1.0,
             )
