@@ -19,26 +19,28 @@ try:
     df['Status'] = df['Status'].astype(str).str.strip()
     
     if 'Progress' in df.columns:
-        # Convert column to strings to clean any raw '%' symbols
+        # Convert column to strings to safely strip any text % signs if they exist
         df['Progress'] = df['Progress'].astype(str).str.replace('%', '', regex=False)
-        # Convert to a clean decimal number
-        df['Progress'] = pd.to_numeric(df['Progress'], errors='coerce').fillna(0)
+        # Convert to raw numbers
+        df['Progress'] = pd.to_numeric(df['Progress'], errors='coerce').fillna(0.0)
         
-        # SMART DETECTION: If your numbers are integers like 50, 80, 100
-        # we scale them down to 0.5, 0.8, 1.0 so Streamlit's ProgressColumn reads them right.
-        # If they are already decimals like 0.5, we leave them alone.
+        # FIXED LOGIC FOR GOOGLE SHEETS PERCENTAGE FORMATTING:
+        # If your sheet exports values as integers greater than 1 (like 50, 75, 100), 
+        # convert them to fractional decimals (0.5, 0.75, 1.0) so Streamlit displays them correctly.
+        # Otherwise, if the maximum value is already 1.0 or less, keep them as decimals.
         if df['Progress'].max() > 1.0:
             df['Progress'] = df['Progress'] / 100.0
     else:
         df['Progress'] = 0.0
 
-    # Calculate metrics using our clean 0.0 to 1.0 decimal values
+    # Calculate overall metrics using clean 0.0 to 1.0 decimal values
     total_tasks = len(df)
     completed_tasks = len(df[df['Status'] == 'Completed'])
     
-    # Calculate overall project percentage (e.g. 0.50 average becomes 50%)
-    overall_progress_pct = int(df['Progress'].mean() * 100) if total_tasks > 0 else 0
-    top_bar_val = max(0.0, min(1.0, df['Progress'].mean())) if total_tasks > 0 else 0.0
+    # Calculate overall project percentage (e.g. 0.65 average becomes 65%)
+    avg_progress = df['Progress'].mean() if total_tasks > 0 else 0.0
+    overall_progress_pct = int(avg_progress * 100)
+    top_bar_val = max(0.0, min(1.0, avg_progress))
 
     # Display status tiles at the top
     col1, col2, col3 = st.columns(3)
@@ -61,7 +63,7 @@ try:
             "Progress": st.column_config.ProgressColumn(
                 "Task Progress",
                 help="The completion percentage of this specific task",
-                format="%.0f%%",
+                format="%.0f%%",  # Formats 1.0 as 100%, 0.65 as 65%
                 min_value=0.0,
                 max_value=1.0,
             )
