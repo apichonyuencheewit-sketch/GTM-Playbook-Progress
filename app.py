@@ -47,12 +47,11 @@ try:
     st.progress(top_bar_val)
     st.write(f"📊 **{overall_progress_pct}%** of total project effort completed.")
 
-    # HTML CUSTOM ROW BREAKDOWN (Completely safe from table formatting bugs)
     st.write("### Detailed Task Breakdown")
     
-    # Render table header
-    st.markdown("""
-    <table style="width:100%; border-collapse: collapse; font-family: sans-serif;">
+    # FIX: Build the ENTIRE HTML table in a single string variable first
+    html_table = """
+    <table style="width:100%; border-collapse: collapse; font-family: sans-serif; background-color: #0e1117;">
         <tr style="background-color: #1e222b; border-bottom: 2px solid #4c566a; text-align: left;">
             <th style="padding: 12px; color: #eceff4;">Task Name</th>
             <th style="padding: 12px; color: #eceff4;">Status</th>
@@ -60,9 +59,9 @@ try:
             <th style="padding: 12px; color: #eceff4;">Priority</th>
             <th style="padding: 12px; color: #eceff4; width: 40%;">Task Progress</th>
         </tr>
-    """, unsafe_allow_html=True)
+    """
 
-    # Populate rows with custom visual HTML layout bars
+    # Append rows to our master HTML string variable
     for _, row in df.iterrows():
         prog_val = int(row['Progress'])
         prog_val = max(0, min(100, prog_val))  # Bound safely to 0-100%
@@ -73,14 +72,14 @@ try:
         # HTML progress tracking structure inject
         html_progress_bar = f"""
         <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="background-color: #2e3440; border-radius: 10px; width: 100%; height: 12px; overflow: hidden; border: 1px solid #434c5e;">
+            <div style="background-color: #2e3440; border-radius: 10px; width: 100%; height: 12px; overflow: hidden; border: 1px solid #434c5e; min-width: 100px;">
                 <div style="background-color: {bar_color}; width: {prog_val}%; height: 100%; border-radius: 10px;"></div>
             </div>
             <span style="font-weight: bold; min-width: 40px; color: #eceff4;">{prog_val}%</span>
         </div>
         """
         
-        st.markdown(f"""
+        html_table += f"""
         <tr style="border-bottom: 1px solid #3b4252;">
             <td style="padding: 12px; color: #e5e9f0;">{row.get('Task Name', 'N/A')}</td>
             <td style="padding: 12px; color: #e5e9f0;"><span style="background-color:#434c5e; padding:3px 8px; border-radius:5px; font-size:12px;">{row.get('Status', 'N/A')}</span></td>
@@ -88,9 +87,12 @@ try:
             <td style="padding: 12px; color: #e5e9f0;">{row.get('Priority', 'N/A')}</td>
             <td style="padding: 12px;">{html_progress_bar}</td>
         </tr>
-        """, unsafe_allow_html=True)
+        """
         
-    st.markdown("</table>", unsafe_allow_html=True)
+    html_table += "</table>"
+
+    # Print the entire table structure at once
+    st.markdown(html_table, unsafe_allow_html=True)
 
 except Exception as e:
     st.error("Connecting to live feed... Check your Google Sheets 'Publish to Web' setup if this takes too long.")
