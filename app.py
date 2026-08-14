@@ -19,28 +19,27 @@ try:
     df['Status'] = df['Status'].astype(str).str.strip()
     
     if 'Progress' in df.columns:
-        # Convert column to strings to safely strip any text % signs if they exist
+        # 1. Strip out text formatting symbols like "%" safely
         df['Progress'] = df['Progress'].astype(str).str.replace('%', '', regex=False)
-        # Convert to raw numbers
+        # 2. Turn them into raw floating numbers
         df['Progress'] = pd.to_numeric(df['Progress'], errors='coerce').fillna(0.0)
         
-        # FIXED LOGIC FOR GOOGLE SHEETS PERCENTAGE FORMATTING:
-        # If your sheet exports values as integers greater than 1 (like 50, 75, 100), 
-        # convert them to fractional decimals (0.5, 0.75, 1.0) so Streamlit displays them correctly.
-        # Otherwise, if the maximum value is already 1.0 or less, keep them as decimals.
-        if df['Progress'].max() > 1.0:
-            df['Progress'] = df['Progress'] / 100.0
+        # 3. FORCE MULTIPLICATION (Bypasses Google Sheet decimal compression)
+        # If Google Sheet exports 1.0 (for 100%), this forces it to a true integer value of 100.0
+        # If Google Sheet exports 0.35 (for 35%), this forces it to a true integer value of 35.0
+        if df['Progress'].max() <= 1.0:
+            df['Progress'] = df['Progress'] * 100.0
+            
     else:
         df['Progress'] = 0.0
 
-    # Calculate overall metrics using clean 0.0 to 1.0 decimal values
+    # Calculate metrics using clean integer percentage scales (0 to 100)
     total_tasks = len(df)
     completed_tasks = len(df[df['Status'] == 'Completed'])
     
-    # Calculate overall project percentage (e.g. 0.65 average becomes 65%)
-    avg_progress = df['Progress'].mean() if total_tasks > 0 else 0.0
-    overall_progress_pct = int(avg_progress * 100)
-    top_bar_val = max(0.0, min(1.0, avg_progress))
+    # Overall summary bar calculation
+    overall_progress_pct = int(df['Progress'].mean()) if total_tasks > 0 else 0
+    top_bar_val = max(0.0, min(100.0, df['Progress'].mean())) / 100.0
 
     # Display status tiles at the top
     col1, col2, col3 = st.columns(3)
@@ -53,17 +52,21 @@ try:
     st.progress(top_bar_val)
     st.write(f"📊 **{overall_progress_pct}%** of total project effort completed.")
 
+    # 4. Create a clean visual clone specifically scaled down for Streamlit's ProgressColumn requirements
+    df_visual = df.copy()
+    df_visual['Progress'] = df_visual['Progress'] / 100.0
+
     # Display detailed table view with INDIVIDUAL PROGRESS BARS
     st.write("### Detailed Task Breakdown")
     st.dataframe(
-        df, 
+        df_visual, 
         use_container_width=True, 
         hide_index=True,
         column_config={
             "Progress": st.column_config.ProgressColumn(
                 "Task Progress",
                 help="The completion percentage of this specific task",
-                format="%.0f%%",  # Formats 1.0 as 100%, 0.65 as 65%
+                format="%.0f%%",  # Maps 1.0 cleanly to 100% text
                 min_value=0.0,
                 max_value=1.0,
             )
