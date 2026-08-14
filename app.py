@@ -9,7 +9,7 @@ st.title("📋 Live Task Progress Monitoring")
 st.subheader("Real-time project tracking for leadership review")
 
 # PASTE YOUR GOOGLE SHEET CSV LINK HERE
-sheet_url = "https://google.com"
+sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRNZW0MtJj3COI8JqrcGgqTqIry8PaiIUHj7HRYYvAZ9Z8l35fNdYVqeXoia11AvdDabdOC0nwlDNO/pub?gid=0&single=true&output=csv"
 
 try:
     # Clear cache and read the live cloud CSV data
