@@ -24,22 +24,23 @@ try:
         # 2. Turn them into raw floating numbers
         df['Progress'] = pd.to_numeric(df['Progress'], errors='coerce').fillna(0.0)
         
-        # 3. FORCE MULTIPLICATION (Bypasses Google Sheet decimal compression)
-        # If Google Sheet exports 1.0 (for 100%), this forces it to a true integer value of 100.0
-        # If Google Sheet exports 0.35 (for 35%), this forces it to a true integer value of 35.0
-        if df['Progress'].max() <= 1.0:
-            df['Progress'] = df['Progress'] * 100.0
+        # 3. ROBUST NORMALIZATION
+        # If your sheet uses whole numbers like 35 or 100, we convert them to decimals (0.35, 1.0)
+        # If your sheet already uses decimals like 0.35 or 1.0, we leave them alone.
+        if df['Progress'].max() > 1.0:
+            df['Progress'] = df['Progress'] / 100.0
             
     else:
         df['Progress'] = 0.0
 
-    # Calculate metrics using clean integer percentage scales (0 to 100)
+    # Calculate metrics using clean decimal scales (0.0 to 1.0)
     total_tasks = len(df)
     completed_tasks = len(df[df['Status'] == 'Completed'])
     
     # Overall summary bar calculation
-    overall_progress_pct = int(df['Progress'].mean()) if total_tasks > 0 else 0
-    top_bar_val = max(0.0, min(100.0, df['Progress'].mean())) / 100.0
+    avg_progress = df['Progress'].mean() if total_tasks > 0 else 0.0
+    overall_progress_pct = int(avg_progress * 100)
+    top_bar_val = max(0.0, min(1.0, avg_progress))
 
     # Display status tiles at the top
     col1, col2, col3 = st.columns(3)
@@ -52,21 +53,17 @@ try:
     st.progress(top_bar_val)
     st.write(f"📊 **{overall_progress_pct}%** of total project effort completed.")
 
-    # 4. Create a clean visual clone specifically scaled down for Streamlit's ProgressColumn requirements
-    df_visual = df.copy()
-    df_visual['Progress'] = df_visual['Progress'] / 100.0
-
-    # Display detailed table view with INDIVIDUAL PROGRESS BARS
+    # Display detailed table view with PERFECT INDIVIDUAL PROGRESS BARS
     st.write("### Detailed Task Breakdown")
     st.dataframe(
-        df_visual, 
+        df,  # Pass the cleaned dataframe directly where max value is guaranteed to be 1.0
         use_container_width=True, 
         hide_index=True,
         column_config={
             "Progress": st.column_config.ProgressColumn(
                 "Task Progress",
                 help="The completion percentage of this specific task",
-                format="%.0f%%",  # Maps 1.0 cleanly to 100% text
+                format="%.0f%%",  # Maps 1.0 cleanly to 100%, and 0.35 to 35%
                 min_value=0.0,
                 max_value=1.0,
             )
